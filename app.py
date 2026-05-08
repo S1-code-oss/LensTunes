@@ -20,6 +20,8 @@ mood_to_folder = {
     'disgust':  'music/disgust/'
 }
 
+for folder in mood_to_folder.values():
+    os.makedirs(folder, exist_ok=True)
 
 pygame.mixer.init()
 
@@ -77,8 +79,7 @@ while True:
         cv2.putText(frame, f'Mood: {current_emotion}', (x, y-10),
                     cv2.FONT_HERSHEY_SIMPLEX, 0.9, (0,255,0), 2)
 
-    cv2.putText(frame, f'Song: {current_song}', (20, 30),
-                cv2.FONT_HERSHEY_SIMPLEX, 0.6, (255,255,0), 2)
+ 
 
     cv2.imshow('LensTunes', frame)
     frame_count += 1
