@@ -1,0 +1,593 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>LensTunes</title>
+<link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;600;700;800&family=DM+Mono:wght@300;400;500&display=swap" rel="stylesheet"/>
+<style>
+  :root {
+    --bg: #0c0c0f;
+    --surface: #13131a;
+    --card: #1a1a24;
+    --border: rgba(255,255,255,0.07);
+    --accent: #c87ad4;
+    --accent2: #70c8d4;
+    --white: #f0eef8;
+    --muted: #6b6880;
+    --angry:   #ff6b6b;
+    --disgust: #a8e063;
+    --fear:    #845ec2;
+    --happy:   #ffd93d;
+    --neutral: #8ecae6;
+    --sad:     #6c8ebf;
+    --surprise:#ff9a3c;
+  }
+
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    background: var(--bg);
+    color: var(--white);
+    font-family: 'Syne', sans-serif;
+    min-height: 100vh;
+    overflow-x: hidden;
+  }
+
+  /* noise overlay */
+  body::before {
+    content: '';
+    position: fixed; inset: 0;
+    background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='0.04'/%3E%3C/svg%3E");
+    pointer-events: none; z-index: 0; opacity: 0.4;
+  }
+
+  .glow {
+    position: fixed;
+    border-radius: 50%;
+    filter: blur(120px);
+    pointer-events: none;
+    z-index: 0;
+    transition: background 1.5s ease;
+  }
+  .glow-1 { width: 500px; height: 500px; top: -100px; left: -100px; background: rgba(200,122,212,0.08); }
+  .glow-2 { width: 400px; height: 400px; bottom: -100px; right: -100px; background: rgba(112,200,212,0.08); }
+
+  /* Layout */
+  .shell {
+    position: relative; z-index: 1;
+    max-width: 1100px;
+    margin: 0 auto;
+    padding: 32px 24px;
+    display: grid;
+    grid-template-rows: auto 1fr auto;
+    min-height: 100vh;
+    gap: 24px;
+  }
+
+  /* Header */
+  header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+  }
+
+  .logo {
+    font-size: 22px;
+    font-weight: 800;
+    letter-spacing: -0.02em;
+  }
+  .logo span { color: var(--accent); }
+
+  .status-pill {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: 100px;
+    padding: 7px 16px;
+    font-family: 'DM Mono', monospace;
+    font-size: 11px;
+    color: var(--muted);
+  }
+
+  .dot {
+    width: 7px; height: 7px;
+    border-radius: 50%;
+    background: var(--muted);
+    transition: background 0.4s;
+  }
+  .dot.active { background: #4ade80; box-shadow: 0 0 8px #4ade80; animation: blink 2s infinite; }
+  .dot.transitioning { background: var(--accent); box-shadow: 0 0 8px var(--accent); }
+
+  @keyframes blink {
+    0%,100% { opacity:1; } 50% { opacity:0.4; }
+  }
+
+  /* Main grid */
+  .main {
+    display: grid;
+    grid-template-columns: 1fr 380px;
+    gap: 20px;
+    align-items: start;
+  }
+
+  /* Camera card */
+  .cam-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 20px;
+    overflow: hidden;
+    position: relative;
+    aspect-ratio: 4/3;
+  }
+
+  .cam-card img {
+    width: 100%; height: 100%;
+    object-fit: cover;
+    display: block;
+  }
+
+  .cam-overlay {
+    position: absolute;
+    inset: 0;
+    background: linear-gradient(to top, rgba(12,12,15,0.7) 0%, transparent 40%);
+    pointer-events: none;
+  }
+
+  .cam-label {
+    position: absolute;
+    bottom: 16px; left: 16px;
+    font-family: 'DM Mono', monospace;
+    font-size: 11px;
+    color: rgba(255,255,255,0.5);
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+  }
+
+  .no-face-badge {
+    position: absolute;
+    top: 14px; right: 14px;
+    background: rgba(12,12,15,0.7);
+    border: 1px solid rgba(255,255,255,0.1);
+    border-radius: 8px;
+    padding: 6px 12px;
+    font-size: 11px;
+    color: var(--muted);
+    font-family: 'DM Mono', monospace;
+    display: none;
+  }
+
+  /* Right panel */
+  .panel {
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+  }
+
+  /* Emotion card */
+  .emotion-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 20px;
+    padding: 28px;
+    position: relative;
+    overflow: hidden;
+    transition: border-color 0.6s;
+  }
+
+  .emotion-card::before {
+    content: '';
+    position: absolute;
+    top: -40px; right: -40px;
+    width: 160px; height: 160px;
+    border-radius: 50%;
+    background: var(--emotion-color, var(--accent));
+    opacity: 0.08;
+    transition: background 0.8s, opacity 0.4s;
+    pointer-events: none;
+  }
+
+  .emotion-label {
+    font-family: 'DM Mono', monospace;
+    font-size: 10px;
+    letter-spacing: 0.15em;
+    color: var(--muted);
+    text-transform: uppercase;
+    margin-bottom: 10px;
+  }
+
+  .emotion-name {
+    font-size: 52px;
+    font-weight: 800;
+    line-height: 1;
+    letter-spacing: -0.03em;
+    text-transform: capitalize;
+    transition: color 0.6s;
+    color: var(--emotion-color, var(--white));
+  }
+
+  .emotion-icon {
+    font-size: 36px;
+    margin-top: 8px;
+    display: block;
+    transition: all 0.4s;
+  }
+
+  /* Confidence bar */
+  .conf-row {
+    margin-top: 16px;
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+  }
+
+  .conf-label {
+    display: flex;
+    justify-content: space-between;
+    font-family: 'DM Mono', monospace;
+    font-size: 10px;
+    color: var(--muted);
+  }
+
+  .conf-bar {
+    height: 4px;
+    background: rgba(255,255,255,0.07);
+    border-radius: 2px;
+    overflow: hidden;
+  }
+
+  .conf-fill {
+    height: 100%;
+    background: var(--emotion-color, var(--accent));
+    border-radius: 2px;
+    transition: width 0.6s ease, background 0.6s;
+    width: 0%;
+  }
+
+  /* Now playing card */
+  .now-playing {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 20px;
+    padding: 24px;
+  }
+
+  .np-label {
+    font-family: 'DM Mono', monospace;
+    font-size: 10px;
+    letter-spacing: 0.15em;
+    color: var(--muted);
+    text-transform: uppercase;
+    margin-bottom: 14px;
+  }
+
+  .np-song {
+    font-size: 15px;
+    font-weight: 700;
+    color: var(--white);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    margin-bottom: 16px;
+  }
+
+  .np-song.empty { color: var(--muted); font-weight: 400; font-style: italic; }
+
+  /* Waveform visualizer */
+  .waveform {
+    display: flex;
+    align-items: center;
+    gap: 3px;
+    height: 32px;
+  }
+
+  .bar {
+    flex: 1;
+    background: var(--emotion-color, var(--accent));
+    border-radius: 2px;
+    opacity: 0.6;
+    animation: wave 1.2s ease-in-out infinite;
+    transition: background 0.6s;
+  }
+
+  .bar:nth-child(1)  { animation-delay: 0s;    --h: 40%; }
+  .bar:nth-child(2)  { animation-delay: 0.1s;  --h: 70%; }
+  .bar:nth-child(3)  { animation-delay: 0.2s;  --h: 55%; }
+  .bar:nth-child(4)  { animation-delay: 0.3s;  --h: 90%; }
+  .bar:nth-child(5)  { animation-delay: 0.15s; --h: 65%; }
+  .bar:nth-child(6)  { animation-delay: 0.25s; --h: 80%; }
+  .bar:nth-child(7)  { animation-delay: 0.05s; --h: 45%; }
+  .bar:nth-child(8)  { animation-delay: 0.35s; --h: 75%; }
+  .bar:nth-child(9)  { animation-delay: 0.2s;  --h: 60%; }
+  .bar:nth-child(10) { animation-delay: 0.1s;  --h: 85%; }
+  .bar:nth-child(11) { animation-delay: 0.3s;  --h: 50%; }
+  .bar:nth-child(12) { animation-delay: 0s;    --h: 70%; }
+
+  @keyframes wave {
+    0%,100% { height: calc(var(--h) * 0.4); }
+    50%      { height: var(--h); }
+  }
+
+  .waveform.paused .bar { animation-play-state: paused; height: 4px; }
+
+  /* Emotion history */
+  .history-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 20px;
+    padding: 24px;
+  }
+
+  .hist-label {
+    font-family: 'DM Mono', monospace;
+    font-size: 10px;
+    letter-spacing: 0.15em;
+    color: var(--muted);
+    text-transform: uppercase;
+    margin-bottom: 14px;
+  }
+
+  .hist-pills {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+  }
+
+  .hist-pill {
+    font-size: 11px;
+    font-weight: 600;
+    padding: 4px 12px;
+    border-radius: 100px;
+    border: 1px solid;
+    text-transform: capitalize;
+    opacity: 0;
+    transform: translateY(4px);
+    animation: pillIn 0.3s forwards;
+  }
+
+  @keyframes pillIn {
+    to { opacity: 1; transform: translateY(0); }
+  }
+
+  /* Footer */
+  footer {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    font-family: 'DM Mono', monospace;
+    font-size: 11px;
+    color: var(--muted);
+    padding: 8px 0;
+  }
+
+  /* Transition overlay flash */
+  .transition-flash {
+    position: fixed; inset: 0;
+    pointer-events: none;
+    z-index: 999;
+    background: var(--accent);
+    opacity: 0;
+    transition: opacity 0.3s;
+  }
+  .transition-flash.show { opacity: 0.04; }
+
+  @media (max-width: 780px) {
+    .main { grid-template-columns: 1fr; }
+    .panel { order: -1; }
+    .emotion-name { font-size: 38px; }
+  }
+</style>
+</head>
+<body>
+
+<div class="glow glow-1"></div>
+<div class="glow glow-2"></div>
+<div class="transition-flash" id="flash"></div>
+
+<div class="shell">
+
+  <header>
+    <div class="logo"><span>Lens</span>Tunes</div>
+    <div class="status-pill">
+      <div class="dot" id="statusDot"></div>
+      <span id="statusText">connecting...</span>
+    </div>
+  </header>
+
+  <div class="main">
+
+    <!-- Camera -->
+    <div class="cam-card">
+      <img src="/video" alt="Camera feed"/>
+      <div class="cam-overlay"></div>
+      <div class="cam-label">live feed</div>
+      <div class="no-face-badge" id="noFaceBadge">no face detected</div>
+    </div>
+
+    <!-- Right panel -->
+    <div class="panel">
+
+      <!-- Emotion -->
+      <div class="emotion-card" id="emotionCard">
+        <div class="emotion-label">Detected Emotion</div>
+        <div class="emotion-name" id="emotionName">—</div>
+        <span class="emotion-icon" id="emotionIcon">👁</span>
+        <div class="conf-row">
+          <div class="conf-label">
+            <span>confidence</span>
+            <span id="confPct">—</span>
+          </div>
+          <div class="conf-bar"><div class="conf-fill" id="confFill"></div></div>
+        </div>
+      </div>
+
+      <!-- Now playing -->
+      <div class="now-playing">
+        <div class="np-label">Now Playing</div>
+        <div class="np-song empty" id="npSong">waiting for emotion...</div>
+        <div class="waveform paused" id="waveform">
+          <div class="bar"></div><div class="bar"></div><div class="bar"></div>
+          <div class="bar"></div><div class="bar"></div><div class="bar"></div>
+          <div class="bar"></div><div class="bar"></div><div class="bar"></div>
+          <div class="bar"></div><div class="bar"></div><div class="bar"></div>
+        </div>
+      </div>
+
+      <!-- History -->
+      <div class="history-card">
+        <div class="hist-label">Emotion History</div>
+        <div class="hist-pills" id="histPills">
+          <span style="font-size:12px;color:var(--muted);font-family:'DM Mono',monospace;">none yet</span>
+        </div>
+      </div>
+
+    </div>
+  </div>
+
+  <footer>
+    <span>AI · Spring 2026 · BCS-4C</span>
+    <span style="color:var(--border)">·</span>
+    <span>Sara Anwaar · Sofia Abdullah · Mahnoor Ahmer</span>
+  </footer>
+
+</div>
+
+<script>
+  const emotionColors = {
+    angry:    '#ff6b6b',
+    disgust:  '#a8e063',
+    fear:     '#845ec2',
+    happy:    '#ffd93d',
+    neutral:  '#8ecae6',
+    sad:      '#6c8ebf',
+    surprise: '#ff9a3c',
+  };
+
+  const emotionIcons = {
+    angry:    '😠',
+    disgust:  '🤢',
+    fear:     '😨',
+    happy:    '😄',
+    neutral:  '😐',
+    sad:      '😢',
+    surprise: '😲',
+  };
+
+  let lastEmotion = '';
+  let history = [];
+
+  function setEmotionColor(emotion) {
+    const color = emotionColors[emotion] || '#c87ad4';
+    document.documentElement.style.setProperty('--emotion-color', color);
+    document.querySelector('.glow-1').style.background = color.replace(')', ',0.1)').replace('rgb', 'rgba').replace('#', 'rgba(').replace('rgba(', 'rgba(') ;
+  }
+
+  // simpler color setter
+  function applyColor(emotion) {
+    const color = emotionColors[emotion] || '#c87ad4';
+    document.querySelectorAll('.conf-fill, .bar').forEach(el => el.style.background = color);
+    document.getElementById('emotionName').style.color = color;
+    document.querySelector('.emotion-card').style.borderColor = color + '44';
+    document.querySelector('.glow-1').style.background = color + '18';
+    document.querySelector('.glow-2').style.background = (emotionColors[emotion] || '#70c8d4') + '12';
+  }
+
+  function addHistory(emotion) {
+    if (history[history.length - 1] === emotion) return;
+    history.push(emotion);
+    if (history.length > 8) history.shift();
+
+    const container = document.getElementById('histPills');
+    container.innerHTML = '';
+    history.forEach((e, i) => {
+      const pill = document.createElement('span');
+      pill.className = 'hist-pill';
+      pill.textContent = e;
+      const color = emotionColors[e] || '#c87ad4';
+      pill.style.color = color;
+      pill.style.borderColor = color + '55';
+      pill.style.background = color + '18';
+      pill.style.animationDelay = (i * 0.05) + 's';
+      container.appendChild(pill);
+    });
+  }
+
+  async function poll() {
+    try {
+      const res = await fetch('/state');
+      const data = await res.json();
+
+      // Status dot
+      const dot = document.getElementById('statusDot');
+      const statusText = document.getElementById('statusText');
+
+      if (data.is_transitioning) {
+        dot.className = 'dot transitioning';
+        statusText.textContent = 'transitioning...';
+      } else if (data.face_detected) {
+        dot.className = 'dot active';
+        statusText.textContent = 'face detected';
+      } else {
+        dot.className = 'dot';
+        statusText.textContent = 'scanning...';
+      }
+
+      // No face badge
+      document.getElementById('noFaceBadge').style.display =
+        data.face_detected ? 'none' : 'block';
+
+      // Emotion
+      const emotion = data.emotion || 'neutral';
+      document.getElementById('emotionName').textContent = emotion || '—';
+      document.getElementById('emotionIcon').textContent = emotionIcons[emotion] || '👁';
+
+      if (emotion !== lastEmotion) {
+        lastEmotion = emotion;
+        applyColor(emotion);
+        addHistory(emotion);
+
+        // Flash
+        const flash = document.getElementById('flash');
+        flash.classList.add('show');
+        setTimeout(() => flash.classList.remove('show'), 300);
+      }
+
+      // Confidence
+      const pct = Math.round((data.confidence || 0) * 100);
+      document.getElementById('confPct').textContent = pct + '%';
+      document.getElementById('confFill').style.width = pct + '%';
+
+      // Now playing
+      const npSong = document.getElementById('npSong');
+      const waveform = document.getElementById('waveform');
+      if (data.song && data.song !== 'no song found') {
+        // strip .mp3 and clean up filename
+        const name = data.song.replace('.mp3', '').replace(/_/g, ' ');
+        npSong.textContent = name;
+        npSong.classList.remove('empty');
+        waveform.classList.remove('paused');
+      } else if (data.song === 'no song found') {
+        npSong.textContent = 'no songs in folder';
+        npSong.classList.add('empty');
+        waveform.classList.add('paused');
+      } else {
+        npSong.textContent = 'waiting for emotion...';
+        npSong.classList.add('empty');
+        waveform.classList.add('paused');
+      }
+
+    } catch (e) {
+      document.getElementById('statusText').textContent = 'disconnected';
+      document.getElementById('statusDot').className = 'dot';
+    }
+
+    setTimeout(poll, 500);
+  }
+
+  poll();
+</script>
+</body>
+</html>
